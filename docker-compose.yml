@@ -1,0 +1,59 @@
+services:
+  reverse-proxy:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: always
+    command:
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--providers.docker.network=traefik-net"
+      - "--providers.docker.exposedByDefault=false"
+      - "--api.insecure=false"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entryPoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls.certresolver=letsencrypt"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=rotour.dev@gmail.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--experimental.plugins.traefik-plugin-waeb.modulename=github.com/tomMoulard/traefik-plugin-waeb"
+      - "--experimental.plugins.traefik-plugin-waeb.version=v1.0.1"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "traefik-certificates:/letsencrypt"
+      - /var/www/files:/var/www/files
+    networks:
+      - traefik-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=myauth"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.myauth.basicauth.users=rotour:$$apr1$$Uhq4Ekc.$$dNr7wA3j7DAHSNsjX4oSV0"
+
+      # Public files
+      # - "traefik.http.routers.fileserver.rule=Host(`files.${ROOT_DOMAIN}`)"
+      # - "traefik.http.routers.fileserver.entrypoints=websecure"
+      # - "traefik.http.routers.fileserver.tls=true"
+      # - "traefik.http.routers.fileserver.tls.certresolver=letsencrypt"
+      # - "traefik.http.routers.fileserver.service=noop@internal"
+      # - "traefik.http.routers.fileserver.middlewares=fileserver"
+      # - "traefik.http.middlewares.fileserver.plugin.traefik-plugin-waeb.root=/var/www/files"
+
+volumes:
+  traefik-certificates:
+
+networks:
+  traefik-net:
+    external: true
